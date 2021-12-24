@@ -34,8 +34,8 @@
 //http://belpugapi/ws6.html?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG&debug=1
 //http://belpugapi/ws6.html?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG
 
-const defaultParams = "?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG";
-const ws_url="ws://belpugapi:3000/signalk/v1/stream";
+var defaultParams = "?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG";
+var ws_url="ws://belpugapi:3000/signalk/v1/stream";
 	
 // Values Array: Acronym, SignalK key, Multiplicator, delta,  Decimals, Display value
 var array_values=[
@@ -71,7 +71,7 @@ var log_value;
 var depth_value;
 var temp_value;
 var key;
-const queryString = window.location.search;
+var queryString = window.location.search;
 
 var urlParams = new URLSearchParams(queryString);
 if (queryString.length==0) {
@@ -230,7 +230,7 @@ function onMessage(evt){
   </script>
 </head>
 <body onload = "init()">
-  <h1>Belpuga WebSocket SignalK v7.02</h1>
+  <h1>Belpuga WebSocket SignalK version 7.03</h1>
 	<table id="counters_table">
 		<tr><th><div id='lbl_1_1'></th><th><div id='lbl_1_2'></th><th><div id='lbl_1_3'></th><th><div id='lbl_1_4'></th><th><div id='lbl_1_5'></th></tr>
 		<tr><td><div id='data_1_1'></div></td><td><div id='data_1_2'></td><td><div id='data_1_3'></div></td><td><div id='data_1_4'></div></td><td><div id='data_1_5'></div></td></tr>
