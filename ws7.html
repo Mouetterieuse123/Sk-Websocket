@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html lang = "en">
 <head>
-<title>BELPUGA v7.02</title>
+<title>BELPUGA version 7.10</title>
   <meta charset = "UTF-8">
   <style type = "text/css">
   h1 {
@@ -72,11 +72,10 @@ var depth_value;
 var temp_value;
 var key;
 var queryString = window.location.search;
+if (queryString.length==0) {queryString = defaultParams;};
 
-var urlParams = new URLSearchParams(queryString);
-if (queryString.length==0) {
-	urlParams = new URLSearchParams(defaultParams);
-	};
+// Not supported by Kobo var urlParams = new URLSearchParams(queryString);
+
 
 function findPosInArray(myKey,column){
 	// Navigate  array_values to find key. 1st column has index 0.
@@ -93,6 +92,15 @@ function mytrunc(myfloat) {
 	var result =  parseInt(myfloat_txt);
 	return result;
   };
+  
+function getParameterByName(name, url) {
+    name = name.replace(/[\[\]]/g, '\\$&');
+    var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+}
 
 function init(){
     output = document.getElementById("output");
@@ -138,20 +146,21 @@ function onClose(evt){
 
 function onMessage(evt){
     //called on receipt of message
+
 	var pi = 3.1415926;
 	var i=0;
 	var pos=0;
 	var obj=JSON.parse(evt.data);
 	var key;
 	var signalk_value;
-	if ( urlParams.get('debug')==1) {console.log(evt.data);};
+	//if ( urlParams.get('debug')==1) {console.log(evt.data);};
 
 	var updated=0;
 	if (Object.keys(obj)[0]=="updates"){
 		var timestamp = obj.updates[0].timestamp;
 
 	for (i=0; i<obj.updates[0].values.length; i++){ //find all path-values
-		//	document.getElementById("curpath").innerHTML= obj.updates[0].values[i].path+"="+obj.updates[0].values[i].value;
+//		document.getElementById("curpath").innerHTML= obj.updates[0].values[i].path+"="+obj.updates[0].values[i].value;
 	//Locate key in array
 		pos = findPosInArray(obj.updates[0].values[i].path,1);
 		if (pos<999) {
@@ -191,16 +200,17 @@ function onMessage(evt){
 				var lon_txt = lon_deg.toFixed(0)+":"+lon_min.toFixed(0)+":"+lon_sec.toFixed(0);
 
 			// Fill table as per URL parameters
-			//	const queryString = window.location.search;
-			//	const urlParams = new URLSearchParams(queryString);
-				var nbLines = urlParams.get('nblines');
-				var nbColumns = urlParams.get('nbcolumns');
+//			 output.innerHTML = "QS:"+queryString;
+				var nbLines = getParameterByName('nblines',queryString);
+				var nbColumns = getParameterByName('nbcolumns',queryString);
+//			 output.innerHTML = "after getparambyname";
+				
 			//	if (nbLines>6) {alert("6 lines maximum, sorry"};
 				var noline = 0; var nocolumn = 0;
 				for (noline=1; noline<=nbLines; noline++) {
 					for (nocolumn=1; nocolumn<=nbColumns; nocolumn++) {
 					
-					var curkey = urlParams.get('val_'+noline+'_'+nocolumn);
+					var curkey = getParameterByName('val_'+noline+'_'+nocolumn,queryString);
 					pos = findPosInArray(curkey,0);
 					if (pos<9999) {
 						document.getElementById("lbl_"+noline+"_"+nocolumn).innerHTML = array_values[pos][0];
@@ -230,7 +240,7 @@ function onMessage(evt){
   </script>
 </head>
 <body onload = "init()">
-  <h1>Belpuga WebSocket SignalK version 7.03</h1>
+  <h1>Belpuga WebSocket SignalK version 7.10</h1>
 	<table id="counters_table">
 		<tr><th><div id='lbl_1_1'></th><th><div id='lbl_1_2'></th><th><div id='lbl_1_3'></th><th><div id='lbl_1_4'></th><th><div id='lbl_1_5'></th></tr>
 		<tr><td><div id='data_1_1'></div></td><td><div id='data_1_2'></td><td><div id='data_1_3'></div></td><td><div id='data_1_4'></div></td><td><div id='data_1_5'></div></td></tr>
@@ -257,6 +267,7 @@ function onMessage(evt){
 	</table>	
 		  
 	<p><div id="output">0 Wait Connecting ...</div></p>
+	<p><div id="curpath">...</div></p>
 
 	<Table>
 	<div id='array_dump'>
