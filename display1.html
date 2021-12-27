@@ -1,0 +1,282 @@
+<!DOCTYPE HTML>
+<html lang = "en">
+<head>
+<title>BELPUGA SignalK v7.12</title>
+  <meta charset = "UTF-8">
+  <style type = "text/css">
+  h1 {
+    text-align: center;
+  }
+  .error {
+    color: red;
+  } 
+  .response {
+    color: blue;
+  }
+  #counters_table {
+	font-family: "Monaco", monospace;
+	border: 1px solid;
+  }
+  #counters_table th {
+	font-size: 20px;
+	border: 1px solid;
+  }
+  #counters_table td {
+	font-size: 100px;
+	border: 1px solid;
+	text-align: center;
+  }
+  </style>
+  <script language="javascript" type="text/javascript">
+"use strict";
+
+// URL example: 
+//http://belpugapi/ws6.html?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG&debug=1
+//http://belpugapi/ws6.html?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG
+
+var defaultParams = "?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG";
+var ws_url="ws://belpugapi:3000/signalk/v1/stream";
+	
+// Values Array: Acronym, SignalK key, Multiplicator, delta,  Decimals, Display value
+var array_values=[
+	["SOG","navigation.speedOverGround",1.94,0,1,0],
+	["COG","navigation.courseOverGroundTrue",57.29,0,0,0],
+	["SPD","navigation.speedThroughWater",1.94,0,1,0],
+	["AWA","environment.wind.angleApparent",57.29,0,0,0],
+	["AWS","environment.wind.speedApparent",1.94,0,1,0],
+	["TWA","environment.wind.angleTrueWater",57.29,0,2,0],
+	["TWS","environment.wind.speedTrue",1.94,0,1,0],
+	["HDG","navigation.headingTrue",57.29,0,0,0],
+    ["LOG","navigation.log",0.00054,0,1,0],
+    ["TOG","navigation.trip.log",0.00054,0,2,0],
+    ["DPT","environment.depth.belowTransducer",1,0,1,0],
+    ["TMP","environment.water.temperature",1,-273.15,1,0]
+	];	
+var output; // html field "output"
+var websocket;
+var tws_value;
+var count;
+var obj;
+var twd_value_deg;
+var awa_value_deg;
+var aws_value_deg;
+var speed_value;
+var hdg_value_deg;
+var pos_txt="unknown";
+var longitude;
+var latitude;
+var log_value=0;
+var depth_value;
+var temp_value;
+var key;
+var queryString = window.location.search;
+if (queryString.length==0) {queryString = defaultParams;};
+
+// Not supported by Kobo var urlParams = new URLSearchParams(queryString);
+
+
+function findPosInArray(myKey,column){
+	// Navigate  array_values to find key. 1st column has index 0.
+	var nbLines = array_values.length;
+	var pos = 9999; var i=0;
+	for (i=0; i<nbLines;i++) {
+		if (array_values[i][column]==myKey) {pos=i};
+	};
+	return pos;
+ };
+
+function mytrunc(myfloat) {
+	var myfloat_txt = myfloat.toFixed(2);
+	var result =  parseInt(myfloat_txt);
+	return result;
+  };
+  
+function getParameterByName(name, url) {
+    name = name.replace(/[\[\]]/g, '\\$&');
+    var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)'),
+        results = regex.exec(url);
+    if (!results) return null;
+    if (!results[2]) return '';
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+}
+
+function init(){
+    output = document.getElementById("output");
+	tws_value=0;
+	twd_value_deg=0;
+	awa_value_deg=0;
+	speed_value=0;
+	hdg_value_deg=0;
+	pos_txt="unknown";
+	latitude=0;
+	longitude=0;
+	count=0;
+	output.innerHTML = "1 Initialised ... Connecting "+ws_url;
+	connect();
+  } // end init
+  
+  function connect(){
+	//open socket
+	output.innerHTML = "2.1 Connecting..."+ws_url ;
+    if ("WebSocket" in window){
+      //websocket = new WebSocket("ws://belpugapi:3000/signalk/v1/stream");
+	  websocket = new WebSocket(ws_url);
+      output.innerHTML = "2.2 Connecting..."+ws_url ;
+      //attach event handlers
+      websocket.onopen = onOpen;
+      websocket.onclose = onClose;
+      websocket.onmessage = onMessage;
+      websocket.onerror = onError;
+	
+	  //var msg = {"context":"*","unsubscribe":[{"path":"navigation.gnss.*"}]};
+	  //websocket.send(JSON.stringify(msg));
+	  //msg = {"context":"*","unsubscribe":[{"path":"network.*"}]};
+	  //websocket.send(JSON.stringify(msg));
+	  //msg = {"context":"*","subscribe":[{"path":"navigation.*","format":"delta",},{"path":"environment.*",}]};
+	  //websocket.send(JSON.stringify(msg));
+    } else {
+      alert("WebSockets not supported on your browser.");
+    } // end if
+  } // end connect
+  
+function onOpen(evt){
+    //called as soon as a connection is opened
+    output.innerHTML = "3 Connected to "+ws_url;
+  } // end onOpen
+  
+function onClose(evt){
+    //called when connection is severed
+    output.innerHTML += "<p>DISCONNECTED</p>";
+  } // end onClose;
+
+function onMessage(evt){
+    //called on receipt of message
+
+	var pi = 3.1415926;
+	var i=0;
+	var pos=0;
+	var obj=JSON.parse(evt.data);
+	var key;
+	var signalk_value;
+	//if ( urlParams.get('debug')==1) {console.log(evt.data);};
+
+	var updated=0;
+	if (Object.keys(obj)[0]=="updates"){
+		var timestamp = obj.updates[0].timestamp;
+
+	for (i=0; i<obj.updates[0].values.length; i++){ //find all path-values
+	//Locate key in array
+		pos = findPosInArray(obj.updates[0].values[i].path,1);
+		if (pos<999) {
+			signalk_value =  parseFloat(obj.updates[0].values[i].value)*array_values[pos][2]+array_values[pos][3];
+			array_values[pos]=
+			[array_values[pos][0],
+			array_values[pos][1],
+			array_values[pos][2],
+			array_values[pos][3],
+			array_values[pos][4],
+			signalk_value.toFixed(array_values[pos][4])];
+            updated=1;
+			
+        }; // end if pos
+
+	//LAT LON
+		if (obj.updates[0].values[i].path == "navigation.position") { 
+			longitude = parseFloat(obj.updates[0].values[i].value.longitude);
+			latitude = parseFloat(obj.updates[0].values[i].value.latitude);
+		};
+	//LOG
+		if (obj.updates[0].values[i].path == "navigation.trip.log") {
+			log_value = parseFloat(obj.updates[0].values[i].value*0.00054);
+		};
+
+
+		if (updated==1){
+				var pos_T = timestamp.indexOf("T");
+				document.getElementById("curtimestamp").innerHTML= timestamp.substr(pos_T+1);
+				var d = new Date();	
+				document.getElementById("curtime").innerHTML=d.getHours()+":"+d.getMinutes()+":"+d.getSeconds();	
+				var lat_deg = mytrunc(latitude);
+				var lat_min = mytrunc((latitude-lat_deg)*60);
+				var lat_sec = mytrunc(((latitude -lat_deg)*60-lat_min)*60);
+				var lat_txt = lat_deg.toFixed(0)+":"+lat_min.toFixed(0)+":"+lat_sec.toFixed(0);
+			
+			
+				var lon_deg = mytrunc(longitude);
+				var lon_min = mytrunc((longitude-lon_deg)*60);
+				var lon_sec = mytrunc(((longitude -lon_deg)*60-lon_min)*60);
+				var lon_txt = lon_deg.toFixed(0)+":"+lon_min.toFixed(0)+":"+lon_sec.toFixed(0);
+
+			// Fill table as per URL parameters
+//			 output.innerHTML = "QS:"+queryString;
+				var nbLines = getParameterByName('nblines',queryString);
+				var nbColumns = getParameterByName('nbcolumns',queryString);
+//			 output.innerHTML = "after getparambyname";
+				
+			//	if (nbLines>6) {alert("6 lines maximum, sorry"};
+				var noline = 0; var nocolumn = 0;
+				for (noline=1; noline<=nbLines; noline++) {
+					for (nocolumn=1; nocolumn<=nbColumns; nocolumn++) {
+					
+					var curkey = getParameterByName('val_'+noline+'_'+nocolumn,queryString);
+					pos = findPosInArray(curkey,0);
+					if (pos<9999) {
+						document.getElementById("lbl_"+noline+"_"+nocolumn).innerHTML = array_values[pos][0];
+                        document.getElementById("data_"+noline+"_"+nocolumn).innerHTML = array_values[pos][5];
+						};
+					}; //end for
+				};
+				document.getElementById("curlat").innerHTML = lat_txt;
+                document.getElementById("curlon").innerHTML = lon_txt;
+				document.getElementById("curlog").innerHTML = log_value.toFixed(1);
+
+				if ( getParameterByName('debug',queryString)==1) {
+					var k=0;
+					var dumpstring = "";
+					for (k=0; k<array_values.length;k++) {
+						dumpstring = dumpstring + array_values[k][0] +" "+ array_values[k][1] +" "+ array_values[k][5]+"<br>";};
+						document.getElementById("array_dump").innerHTML = dumpstring;
+					}
+				}; //end If Update
+		};
+	};	
+			
+  } // end onMessage
+  function onError(evt){
+    //called on error
+    output.innerHTML += "<p class = 'error'>ERROR: " + evt.data + "</p>";
+  } // end onError
+
+  </script>
+</head>
+<body onload = "init()">
+  <table id="counters_table">
+	<tr><th><div id='lbl_1_1'></th><th><div id='lbl_1_2'></th><th><div id='lbl_1_3'></th><th><div id='lbl_1_4'></th><th><div id='lbl_1_5'></th></tr>
+	<tr><td><div id='data_1_1'></div></td><td><div id='data_1_2'></td><td><div id='data_1_3'></div></td><td><div id='data_1_4'></div></td><td><div id='data_1_5'></div></td></tr>
+    <tr><th><div id='lbl_2_1'></th><th><div id='lbl_2_2'></th><th><div id='lbl_2_3'></th><th><div id='lbl_2_4'></th><th><div id='lbl_2_5'></th></tr>
+    <tr><td><div id='data_2_1'></div></td><td><div id='data_2_2'></td><td><div id='data_2_3'></div></td><td><div id='data_2_4'></div></td><td><div id='data_2_5'></div></td></tr>
+    <tr><th><div id='lbl_3_1'></th><th><div id='lbl_3_2'></th><th><div id='lbl_3_3'></th><th><div id='lbl_3_4'></th><th><div id='lbl_3_5'></th></tr>
+    <tr><td><div id='data_3_1'></div></td><td><div id='data_3_2'></td><td><div id='data_3_3'></div></td><td><div id='data_3_4'></div></td><td><div id='data_3_5'></div></td></tr>
+    <tr><th><div id='lbl_4_1'></th><th><div id='lbl_4_2'></th><th><div id='lbl_4_3'></th><th><div id='lbl_4_4'></th><th><div id='lbl_4_5'></th></tr>
+    <tr><td><div id='data_4_1'></div></td><td><div id='data_4_2'></td><td><div id='data_4_3'></div></td><td><div id='data_4_4'></div></td><td><div id='data_4_5'></div></td></tr>
+    <tr><th><div id='lbl_5_1'></th><th><div id='lbl_5_2'></th><th><div id='lbl_5_3'></th><th><div id='lbl_5_4'></th><th><div id='lbl_5_5'></th></tr>
+    <tr><td><div id='data_1_1'></div></td><td><div id='data_1_2'></td><td><div id='data_1_3'></div></td><td><div id='data_1_4'></div></td><td><div id='data_1_5'></div></td></tr>
+    <tr><th><div id='lbl_6_1'></th><th><div id='lbl_6_2'></th><th><div id='lbl_6_3'></th><th><div id='lbl_6_4'></th><th><div id='lbl_6_5'></th></tr>
+    <tr><td><div id='data_6_1'></div></td><td><div id='data_6_2'></td><td><div id='data_6_3'></div></td><td><div id='data_6_4'></div></td><td><div id='data_6_5'></div></td></tr>
+  </table>
+   
+  <table>
+	<tr><th>Time</th><th>Lat</th><th>Lon</th><th>Log</th></tr>
+	<tr><td><div id='curtime'></td><td><div id='curlat'></td><td><div id='curlon'></td><td><div id='curlog'></td></tr>
+	<tr><td>Timestamp:</td><td><div id='curtimestamp'></td></tr>
+	</table>	
+		  
+	<p><div id="output">0 Wait Connecting ...</div></p>
+	<p><div id="curpath">...</div></p>
+
+	<Table>
+	<div id='array_dump'>
+	</table>
+
+</body>
+</html>
