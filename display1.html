@@ -1,7 +1,7 @@
 <!DOCTYPE HTML>
 <html lang = "en">
 <head>
-<title>BELPUGA SignalK v7.12</title>
+<title>BELPUGA SignalK v7.15</title>
   <meta charset = "UTF-8">
   <style type = "text/css">
   h1 {
@@ -22,9 +22,22 @@
 	border: 1px solid;
   }
   #counters_table td {
-	font-size: 100px;
+	font-size: 110px;
 	border: 1px solid;
 	text-align: center;
+  }
+  #logbook_table {
+	font-family: "Monaco", monospace;
+	font-size: 10px;
+	border: 1px solid;
+  }
+  #logbook_table th {
+	border: 1px solid;
+  }
+  #logbook_table td {
+	font-size: 15px;
+	text-align: center;
+	border: 1px solid;
   }
   </style>
   <script language="javascript" type="text/javascript">
@@ -46,8 +59,9 @@ var array_values=[
 	["AWS","environment.wind.speedApparent",1.94,0,1,0],
 	["TWA","environment.wind.angleTrueWater",57.29,0,2,0],
 	["TWS","environment.wind.speedTrue",1.94,0,1,0],
+	["TWD","environment.wind.directionTrue",57.29,0,0,0],
 	["HDG","navigation.headingTrue",57.29,0,0,0],
-    ["LOG","navigation.log",0.00054,0,1,0],
+    ["LOG","navigation.log",0.00054,0,0,0],
     ["TOG","navigation.trip.log",0.00054,0,2,0],
     ["DPT","environment.depth.belowTransducer",1,0,1,0],
     ["TMP","environment.water.temperature",1,-273.15,1,0]
@@ -127,7 +141,8 @@ function init(){
       websocket.onclose = onClose;
       websocket.onmessage = onMessage;
       websocket.onerror = onError;
-	
+	  
+	  //Unsuscribe not working as expected ...
 	  //var msg = {"context":"*","unsubscribe":[{"path":"navigation.gnss.*"}]};
 	  //websocket.send(JSON.stringify(msg));
 	  //msg = {"context":"*","unsubscribe":[{"path":"network.*"}]};
@@ -158,7 +173,7 @@ function onMessage(evt){
 	var obj=JSON.parse(evt.data);
 	var key;
 	var signalk_value;
-	//if ( urlParams.get('debug')==1) {console.log(evt.data);};
+	if ( getParameterByName('debug',queryString)==1) {console.log(evt.data);};
 
 	var updated=0;
 	if (Object.keys(obj)[0]=="updates"){
@@ -186,7 +201,7 @@ function onMessage(evt){
 			latitude = parseFloat(obj.updates[0].values[i].value.latitude);
 		};
 	//LOG
-		if (obj.updates[0].values[i].path == "navigation.trip.log") {
+		if (obj.updates[0].values[i].path == "navigation.log") {
 			log_value = parseFloat(obj.updates[0].values[i].value*0.00054);
 		};
 
@@ -226,9 +241,15 @@ function onMessage(evt){
 						};
 					}; //end for
 				};
+				//Fill bottom values to be copied in logbook
 				document.getElementById("curlat").innerHTML = lat_txt;
                 document.getElementById("curlon").innerHTML = lon_txt;
-				document.getElementById("curlog").innerHTML = log_value.toFixed(1);
+				pos = findPosInArray("LOG",0);
+				document.getElementById("curlog").innerHTML = array_values[pos][5];;
+				pos = findPosInArray("TWS",0);
+				document.getElementById("curtws").innerHTML = array_values[pos][5];;
+				pos = findPosInArray("TWD",0);
+				document.getElementById("curtwd").innerHTML = array_values[pos][5];;
 
 				if ( getParameterByName('debug',queryString)==1) {
 					var k=0;
@@ -265,9 +286,9 @@ function onMessage(evt){
     <tr><td><div id='data_6_1'></div></td><td><div id='data_6_2'></td><td><div id='data_6_3'></div></td><td><div id='data_6_4'></div></td><td><div id='data_6_5'></div></td></tr>
   </table>
    
-  <table>
-	<tr><th>Time</th><th>Lat</th><th>Lon</th><th>Log</th></tr>
-	<tr><td><div id='curtime'></td><td><div id='curlat'></td><td><div id='curlon'></td><td><div id='curlog'></td></tr>
+  <table id="logbook_table">
+	<tr><th>Time</th><th>Lat</th><th>Lon</th><th>Log</th><th>TWS</th><th>TWD</th></tr>
+	<tr><td><div id='curtime'></td><td><div id='curlat'></td><td><div id='curlon'></td><td><div id='curlog'></td><td><div id='curtws'></td><td><div id='curtwd'></td></tr>
 	<tr><td>Timestamp:</td><td><div id='curtimestamp'></td></tr>
 	</table>	
 		  
