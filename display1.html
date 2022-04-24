@@ -36,7 +36,7 @@
 	border: 1px solid;
   }
   #logbook_table td {
-	font-size: 15px;
+	font-size: 25px;
 	text-align: center;
 	border: 1px solid;
   }
@@ -46,9 +46,11 @@
 
 // URL example: 
 //http://belpugapi/ws6.html?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG&debug=1
-//http://belpugapi/ws6.html?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG
+//http://belpugapi/ws6.html?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=TWA&val_3_1=DPT&val_3_2=TWS
+//Nav station 2*4:
+//http://belpugapi/ws2.html?nblines=2&nbcolumns=4&val_1_1=TWS&val_1_2=TWD&val_1_3=COG&val_1_4=SPD&val_2_1=TWA&val_2_2=DPT&val_2_3=DWP&val_2_4=CWP
 
-var defaultParams = "?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=AWS&val_3_1=DPT&val_3_2=TOG";
+var defaultParams = "?nblines=3&nbcolumns=2&val_1_1=SPD&val_1_2=COG&val_2_1=AWA&val_2_2=TWA&val_3_1=DPT&val_3_2=TWS";
 var ws_url="ws://belpugapi:3000/signalk/v1/stream";
 	
 // Values Array: Acronym, SignalK key, Multiplicator, delta,  Decimals, Display value
@@ -58,15 +60,18 @@ var array_values=[
 	["SPD","navigation.speedThroughWater",1.94,0,1,0],
 	["AWA","environment.wind.angleApparent",57.29,0,0,0],
 	["AWS","environment.wind.speedApparent",1.94,0,1,0],
-	["TWA","environment.wind.angleTrueWater",57.29,0,2,0],
-	["TWS","environment.wind.speedTrue",1.94,0,1,0],
+	["TWA","environment.wind.angleTrueWater",57.29,0,0,0],
+	["TWS","environment.wind.speedTrue",1.94,0,0,0],
 	["TWD","environment.wind.directionTrue",57.29,0,0,0],
 	["HDG","navigation.headingTrue",57.29,0,0,0],
     ["LOG","navigation.log",0.00054,0,0,0],
     ["TOG","navigation.trip.log",0.00054,0,2,0],
     ["DPT","environment.depth.belowTransducer",1,0,1,0],
-    ["TMP","environment.water.temperature",1,-273.15,1,0]
-	];	
+    ["TMP","environment.water.temperature",1,-273.15,1,0],
+    ["DWP","navigation.courseRhumbline.nextPoint.distance",0.00054,0,1,0],
+    ["CWP","navigation.courseRhumbline.nextPoint.bearingTrue",57.29,0,0,0]	
+    ];	
+	
 var output; // html field "output"
 var websocket;
 var tws_value;
@@ -174,6 +179,7 @@ function onMessage(evt){
 	var obj=JSON.parse(evt.data);
 	var key;
 	var signalk_value;
+	var signalk_value_string;
 	if ( getParameterByName('debug',queryString)==1) {console.log(evt.data);};
 
 	var updated=0;
@@ -185,13 +191,21 @@ function onMessage(evt){
 		pos = findPosInArray(obj.updates[0].values[i].path,1);
 		if (pos<999) {
 			signalk_value =  parseFloat(obj.updates[0].values[i].value)*array_values[pos][2]+array_values[pos][3];
+			if (signalk_value<0) {signalk_value=-signalk_value}; // No negative values
+			signalk_value_string = signalk_value.toFixed(array_values[pos][4]);
+			if (array_values[pos][2]==57.29) // Format angles with 3 digits
+				{
+					signalk_value_string = "00"+signalk_value_string;
+					signalk_value_string = signalk_value_string.substring(signalk_value_string.length-3,99);
+					
+				};
 			array_values[pos]=
 			[array_values[pos][0],
 			array_values[pos][1],
 			array_values[pos][2],
 			array_values[pos][3],
 			array_values[pos][4],
-			signalk_value.toFixed(array_values[pos][4])];
+			signalk_value_string];
             updated=1;
 			
         }; // end if pos
@@ -209,19 +223,22 @@ function onMessage(evt){
 
 		if (updated==1){
 				var pos_T = timestamp.indexOf("T");
-				document.getElementById("curtimestamp").innerHTML= timestamp.substr(pos_T+1);
+				//document.getElementById("curtimestamp").innerHTML= timestamp.substr(pos_T+1);
 				var d = new Date();	
 				document.getElementById("curtime").innerHTML=d.getHours()+":"+d.getMinutes()+":"+d.getSeconds();	
+				var lat_dir = " N";
+				if (latitude<0) {lat_dir = " S"};
 				var lat_deg = mytrunc(latitude);
 				var lat_min = mytrunc((latitude-lat_deg)*60);
 				var lat_sec = mytrunc(((latitude -lat_deg)*60-lat_min)*60);
-				var lat_txt = lat_deg.toFixed(0)+":"+lat_min.toFixed(0)+":"+lat_sec.toFixed(0);
+				var lat_txt = lat_deg.toFixed(0)+":"+lat_min.toFixed(0)+":"+lat_sec.toFixed(0)+lat_dir;
 			
-			
+				var lon_dir = " E";
+				if (longitude<0) {lon_dir = " W"};			
 				var lon_deg = mytrunc(longitude);
 				var lon_min = mytrunc((longitude-lon_deg)*60);
 				var lon_sec = mytrunc(((longitude -lon_deg)*60-lon_min)*60);
-				var lon_txt = lon_deg.toFixed(0)+":"+lon_min.toFixed(0)+":"+lon_sec.toFixed(0);
+				var lon_txt = lon_deg.toFixed(0)+":"+lon_min.toFixed(0)+":"+lon_sec.toFixed(0)+lon_dir;
 
 			// Fill table as per URL parameters
 //			 output.innerHTML = "QS:"+queryString;
@@ -246,11 +263,13 @@ function onMessage(evt){
 				document.getElementById("curlat").innerHTML = lat_txt;
                 document.getElementById("curlon").innerHTML = lon_txt;
 				pos = findPosInArray("LOG",0);
-				document.getElementById("curlog").innerHTML = array_values[pos][5];;
+				document.getElementById("curlog").innerHTML = array_values[pos][5];
 				pos = findPosInArray("TWS",0);
-				document.getElementById("curtws").innerHTML = array_values[pos][5];;
+				document.getElementById("curtws").innerHTML = array_values[pos][5];
 				pos = findPosInArray("TWD",0);
-				document.getElementById("curtwd").innerHTML = array_values[pos][5];;
+				document.getElementById("curtwd").innerHTML = array_values[pos][5];
+				pos = findPosInArray("SOG",0);
+				document.getElementById("cursog").innerHTML = array_values[pos][5];
 
 				if ( getParameterByName('debug',queryString)==1) {
 					var k=0;
@@ -288,9 +307,8 @@ function onMessage(evt){
   </table>
    
   <table id="logbook_table">
-	<tr><th>Time</th><th>Lat</th><th>Lon</th><th>Log</th><th>TWS</th><th>TWD</th></tr>
-	<tr><td><div id='curtime'></td><td><div id='curlat'></td><td><div id='curlon'></td><td><div id='curlog'></td><td><div id='curtws'></td><td><div id='curtwd'></td></tr>
-	<tr><td>Timestamp:</td><td><div id='curtimestamp'></td></tr>
+	<tr><th>Time</th><th>Lat</th><th>Lon</th><th>Log</th><th>TWS</th><th>TWD</th><th>SOG</th></tr>
+	<tr><td><div id='curtime'></td><td><div id='curlat'></td><td><div id='curlon'></td><td><div id='curlog'></td><td><div id='curtws'></td><td><div id='curtwd'></td><td><div id='cursog'></td></tr>
 	</table>	
 		  
 	<p><div id="output">0 Wait Connecting ...</div></p>
